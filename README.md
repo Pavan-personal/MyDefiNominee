@@ -2,8 +2,7 @@
 
 
 <img width="670" height="3280" alt="screencapture-localhost-3000-nominee-2025-08-25-03_05_33" src="https://github.com/user-attachments/assets/a9613934-df78-4ba4-a775-9a18855f23f0" />
-<img width="670" height="956" alt="Screenshot 2025-08-25 at 2 53 13 AM" src="https://github.com/user-attachments/assets/f
-96bfbc4-6c56-45e2-a1b1-adafe41764cf" />
+<img width="670" height="956" alt="Screenshot 2025-08-25 at 2 53 13 AM" src="https://github.com/user-attachments/assets/f96bfbc4-6c56-45e2-a1b1-adafe41764cf" />
 <img width="670" height="2082" alt="screencapture-localhost-3000-nominee-2025-08-25-03_03_52" src="https://github.com/user-attachments/assets/abd9d152-f9ce-42c1-943b-449758ec9ca3" />
 <img width="670" height="956" alt="Screenshot 2025-08-25 at 2 53 29 AM" src="https://github.com/user-attachments/assets/d8083f64-cfb0-4726-b188-1f81b99a9ea4" />
 
