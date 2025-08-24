@@ -50,7 +50,7 @@ export default function Home() {
               </Link>
               <Link href="/nominee" className="w-full md:w-[200px]">
                 <div className="w-full md:w-[200px] py-3 text-gray-900 border border-gray-200 hover:border-gray-400 transition-colors text-center font-funnel-display">
-                  File Nominee System
+MyDefiNomineeVault
                 </div>
               </Link>
             </div>
