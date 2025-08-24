@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  address   String   @unique // Ethereum wallet address
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  ownedVaults    Vault[] @relation("VaultOwner")
+  nomineeVaults  Vault[] @relation("VaultNominee")
+  accessLogs     AccessLog[]
+
+  @@index([address])
+}
+
+model Vault {
+  id          String   @id @default(cuid())
+  title       String?  // Optional title
+  description String   // Vault description
+  fileName    String?  // Original file name
+  fileType    String?  // File MIME type
+  fileSize    Int?     // File size in bytes
+  fileHash    String?  // File hash for metadata
+  ipfsHash    String?  // IPFS hash for file content
+  
+  // Blockchain data
+  blockchainId    String?  // Smart contract vault ID
+  encryptedData   String?  // Encrypted data hash
+  unlockTime      DateTime // When vault unlocks
+  status          VaultStatus @default(LOCKED)
+  
+  // Relationships
+  ownerId   String
+  owner     User   @relation("VaultOwner", fields: [ownerId], references: [id])
+  
+  nominees  User[] @relation("VaultNominee")
+  
+  accessLogs AccessLog[]
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  unlockedAt DateTime?
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([unlockTime])
+  @@index([blockchainId])
+}
+
+model AccessLog {
+  id        String   @id @default(cuid())
+  
+  // Relationships
+  vaultId   String
+  vault     Vault   @relation(fields: [vaultId], references: [id])
+  
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  
+  // Access details
+  accessType AccessType
+  timestamp  DateTime @default(now())
+  ipAddress  String?
+  userAgent  String?
+
+  @@index([vaultId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+enum VaultStatus {
+  LOCKED
+  UNLOCKED
+  EXPIRED
+}
+
+enum AccessType {
+  CREATED
+  VIEWED
+  DOWNLOADED
+  UNLOCKED
+}

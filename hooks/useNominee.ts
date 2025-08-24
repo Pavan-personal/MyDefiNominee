@@ -39,15 +39,8 @@ export const useNominee = () => {
   const [estimatedUnlockTime, setEstimatedUnlockTime] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  // Store created vaults in local state with persistence
-  const [createdVaults, setCreatedVaults] = useState<FileAsset[]>(() => {
-    // Load from localStorage on component mount
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('myVaults');
-      return saved ? JSON.parse(saved) : [];
-    }
-    return [];
-  });
+  // Database integration - no more localStorage needed!
+  const [createdVaults, setCreatedVaults] = useState<FileAsset[]>([]);
   
   const signer = useEthersSigner();
   const provider = useEthersProvider();
@@ -294,32 +287,41 @@ export const useNominee = () => {
 
       const receipt = await tx.wait(2);
 
-      // Create new vault asset
-      const newVault: FileAsset = {
-        id: Date.now().toString(),
-        fileName: selectedFile ? selectedFile.name : "No file uploaded",
-        fileType: selectedFile ? selectedFile.type : "text/plain",
-        fileSize: selectedFile ? selectedFile.size : 0,
-        fileHash: fileHash || "0x0000000000000000000000000000000000000000000000000000000000000000",
-        ipfsHash: ipfsHash || undefined,
-        title: "Vault", // Default title since we removed title field
-        description: description,
-        owner: address!,
-        nominees: validNominees,
-        unlockTime: new Date(unlockDate),
-        status: 'locked' as const,
-        createdAt: new Date()
-      };
+      // Save vault to database
+      try {
+        const vaultData = {
+          ownerAddress: address,
+          description: description,
+          fileName: selectedFile ? selectedFile.name : null,
+          fileType: selectedFile ? selectedFile.type : null,
+          fileSize: selectedFile ? selectedFile.size : null,
+          fileHash: selectedFile ? fileHash : null,
+          ipfsHash: selectedFile ? ipfsHash : null,
+          nominees: validNominees,
+          unlockTime: unlockDate,
+          blockchainId: receipt.transactionHash, // Use transaction hash as blockchain ID
+          encryptedData: ethers.hexlify(encodedMessage) // Store encrypted data hash
+        };
 
-      // Add to created vaults
-      setCreatedVaults(prev => {
-        const updated = [...prev, newVault];
-        // Save to localStorage
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('myVaults', JSON.stringify(updated));
+        const response = await fetch('/api/vaults', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(vaultData)
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save vault to database');
         }
-        return updated;
-      });
+
+        const savedVault = await response.json();
+        console.log('✅ Vault saved to database:', savedVault);
+
+        // Refresh vault list
+        refetchVaults();
+      } catch (error) {
+        console.error('❌ Error saving vault to database:', error);
+        // Continue with blockchain success, but log database error
+      }
 
       // Reset form
       setDescription("");
@@ -330,72 +332,47 @@ export const useNominee = () => {
       setUploadProgress(0);
       setActiveTab("dashboard");
 
-      console.log("✅ Vault created successfully:", newVault);
+      console.log("✅ Vault created successfully and saved to database");
 
       return receipt;
     },
   });
 
-  // Get file assets based on user role
-  const { data: fileAssets = [] } = useQuery({
-    queryKey: ['fileAssets', address, createdVaults],
+  // Get vaults summary from new API
+  const { data: vaultsSummary, refetch: refetchVaults } = useQuery({
+    queryKey: ['vaultsSummary', address],
     queryFn: async () => {
-      if (!address) return [];
+      if (!address) return null;
       
-      // This would normally fetch from blockchain
-      // For now, return mock data to demonstrate the concept
-      const mockFileAssets = [
-        {
-          id: "1",
-          fileName: "important_document.pdf",
-          fileType: "application/pdf",
-          fileSize: 2048576, // 2MB
-          fileHash: "0x1234567890abcdef",
-          ipfsHash: "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG", // Sample IPFS hash
-          title: "Legal Documents",
-          description: "Important legal documents and contracts",
-          owner: "0x1234567890123456789012345678901234567890",
-          nominees: ["0x2345678901234567890123456789012345678901"],
-          unlockTime: new Date(Date.now() + 86400000), // 24 hours from now
-          status: 'locked' as const,
-          createdAt: new Date()
-        },
-        {
-          id: "2",
-          fileName: "family_photos.zip",
-          fileType: "application/zip",
-          fileSize: 5242880, // 5MB
-          fileHash: "0xabcdef1234567890",
-          ipfsHash: "QmW2WQi7j6c7UgJTarActp7tDNikE4B2qXtBCf8BBY9zX", // Sample IPFS hash
-          title: "Family Memories",
-          description: "Personal family photos and videos",
-          owner: "0x4567890123456789012345678901234567890123",
-          nominees: ["0x1234567890123456789012345678901234567890"],
-          unlockTime: new Date(Date.now() - 86400000), // 24 hours ago (unlocked)
-          status: 'unlocked' as const,
-          createdAt: new Date(Date.now() - 172800000) // 2 days ago
+      try {
+        // Fetch vaults summary from new API
+        const response = await fetch(`/api/vaults/summary?address=${address}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch vaults summary');
         }
-      ];
-
-      // Combine mock data with created vaults
-      const allAssets = [...mockFileAssets, ...createdVaults];
-
-      // Filter based on user role
-      const userFileAssets = allAssets.filter(asset => 
-        asset.owner.toLowerCase() === address.toLowerCase() || 
-        asset.nominees.some(nominee => nominee.toLowerCase() === address.toLowerCase())
-      );
-
-      return userFileAssets.map(asset => ({
-        ...asset,
-        userRole: asset.owner.toLowerCase() === address.toLowerCase() ? ('owner' as const) : ('nominee' as const)
-      }));
-    }
+        
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('Error fetching vaults summary:', error);
+        return null;
+      }
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds for real-time updates
+    refetchIntervalInBackground: true
   });
 
+  // Extract vaults from summary
+  const myVaults = vaultsSummary?.my_vaults || [];
+  const lockedVaults = vaultsSummary?.vaults_shared_with_me?.locked || [];
+  const unlockedVaults = vaultsSummary?.vaults_shared_with_me?.unlocked || [];
+  
+  // Combine all vaults for display
+  const allVaults = [...myVaults, ...unlockedVaults];
+
   // Separate assets by user role
-  const myFileAssets = fileAssets.filter(asset => asset.userRole === 'owner');
-  const myNomineeFileAssets = fileAssets.filter(asset => asset.userRole === 'nominee');
+  const myFileAssets = myVaults;
+  const myNomineeFileAssets = unlockedVaults;
 
   // Download file (when unlocked)
   const downloadFile = async (asset: FileAsset) => {
@@ -464,7 +441,8 @@ export const useNominee = () => {
     // Data
     myFileAssets,
     myNomineeFileAssets,
-    allFileAssets: fileAssets,
+    allFileAssets: allVaults,
+    vaultsSummary,
     
     // User info
     userAddress: address,

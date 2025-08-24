@@ -1,9 +1,10 @@
 "use client";
 import { useNominee } from "@/hooks/useNominee";
+import "@/lib/unlockService"; // Import unlock service for background unlock detection
 import { Tab } from "@headlessui/react";
 import {
     XMarkIcon, ClockIcon, UserGroupIcon, DocumentTextIcon,
-    ShieldCheckIcon, DocumentIcon, PhotoIcon, FilmIcon, ArchiveBoxIcon, ArrowDownTrayIcon,
+    ShieldCheckIcon, DocumentIcon, PhotoIcon, FilmIcon, ArchiveBoxIcon,
     LockClosedIcon, KeyIcon, GlobeAltIcon, SparklesIcon, CalendarIcon, ExclamationTriangleIcon
 } from "@heroicons/react/24/outline";
 import { SunIcon, MoonIcon, WalletIcon } from "@heroicons/react/24/solid";
@@ -58,8 +59,12 @@ export default function NomineePage() {
         description, setDescription, nominees,
         unlockDate, setUnlockDate, removeNominee, updateNominee,
         createNomineeRequest, selectedFile, handleFileSelect, removeSelectedFile,
-        myFileAssets, myNomineeFileAssets, userAddress, isValid, downloadFile, formatFileSize
+        myFileAssets, myNomineeFileAssets, userAddress, isValid, formatFileSize
     } = useNominee();
+
+    // Get locked vaults from the hook
+    const { vaultsSummary } = useNominee();
+    const lockedVaults = vaultsSummary?.vaults_shared_with_me?.locked || [];
 
     const allFileAssets = [...myFileAssets, ...myNomineeFileAssets];
 
@@ -640,37 +645,66 @@ export default function NomineePage() {
                                             My Created Vaults
                                         </h3>
                                         <div className="grid gap-4">
-                                            {myFileAssets.map((asset) => (
+                                            {myFileAssets.map((asset: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                                                 <div key={asset.id} className={clsx(
                                                     "border rounded-lg p-4 hover:shadow-md transition-shadow",
                                                     isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
                                                 )}>
                                                     <div className="flex items-center justify-between">
-                                                        <div className="flex items-center space-x-3">
-                                                            {React.createElement(getFileIcon(asset.fileType), { className: clsx("w-8 h-8", isDarkMode ? "text-gray-400" : "text-gray-600") })}
-                                                            <div>
-                                                                <p className={clsx("font-medium", isDarkMode ? "text-white" : "text-gray-900")}>{asset.title}</p>
-                                                                <p className={clsx("text-sm", isDarkMode ? "text-gray-400" : "text-gray-500")}>{asset.description}</p>
-                                                                {asset.fileName && (
-                                                                    <p className={clsx("text-xs", isDarkMode ? "text-gray-500" : "text-gray-400")}>{asset.fileName} • {formatFileSize(asset.fileSize)}</p>
-                                                                )}
-                                                                {asset.ipfsHash && (
-                                                                    <p className={clsx("text-xs", isDarkMode ? "text-blue-400" : "text-blue-600")}>
-                                                                        🌐 IPFS: {asset.ipfsHash.substring(0, 10)}...{asset.ipfsHash.substring(asset.ipfsHash.length - 8)}
-                                                                    </p>
-                                                                )}
-                                                            </div>
+                                                        <div>
+                                                            <p className={clsx("font-medium", isDarkMode ? "text-white" : "text-gray-900")}>
+                                                                Owner: {asset.owner.address.substring(0, 10)}...{asset.owner.address.substring(asset.owner.address.length - 8)}
+                                                            </p>
                                                         </div>
-                                                        <div className="text-right">
-                                                            <div className="flex items-center space-x-2 mb-2">
-                                                                <ClockIcon className={clsx("w-4 h-4", isDarkMode ? "text-gray-500" : "text-gray-400")} />
-                                                                <span className={clsx("text-sm", isDarkMode ? "text-gray-400" : "text-gray-500")}>
-                                                                    {asset.status === 'unlocked' ? 'Unlocked' : 'Unlocks ' + asset.unlockTime.toLocaleDateString()}
-                                                                </span>
-                                                            </div>
+                                                        <div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    console.log('Complete Vault Data:', asset);
+                                                                    alert('Check console for complete vault data!');
+                                                                }}
+                                                                className={clsx(
+                                                                    "inline-flex items-center px-3 py-1 text-sm rounded-md transition-colors",
+                                                                    isDarkMode
+                                                                        ? "bg-gray-600 text-white hover:bg-gray-500"
+                                                                        : "bg-gray-200 text-gray-700 hover:bg-gray-800 hover:text-white"
+                                                                )}
+                                                            >
+                                                                <DocumentIcon className="w-4 h-4 mr-1" />
+                                                                View Raw Details
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Locked Vaults Shared With Me */}
+                                {lockedVaults && lockedVaults.length > 0 && (
+                                    <div>
+                                        <h3 className={clsx("text-xl font-semibold mb-4 flex items-center", isDarkMode ? "text-white" : "text-gray-900")}>
+                                            <LockClosedIcon className="w-5 h-5 mr-2" />
+                                            Locked Vaults (Shared With Me)
+                                        </h3>
+                                        <div className="grid gap-4">
+                                            {lockedVaults.map((vault: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+                                                <div key={vault.id} className={clsx(
+                                                    "border rounded-lg p-4 hover:shadow-md transition-shadow",
+                                                    isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+                                                )}>
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <p className={clsx("font-medium", isDarkMode ? "text-white" : "text-gray-900")}>
+                                                                Owner: {vault.owner_wallet_address.substring(0, 10)}...{vault.owner_wallet_address.substring(vault.owner_wallet_address.length - 8)}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex items-center space-x-3">
                                                             <div className="flex items-center space-x-2">
-                                                                <UserGroupIcon className={clsx("w-4 h-4", isDarkMode ? "text-gray-500" : "text-gray-400")} />
-                                                                <span className={clsx("text-sm", isDarkMode ? "text-gray-400" : "text-gray-500")}>{asset.nominees.length} nominees</span>
+                                                                <LockClosedIcon className={clsx("w-5 h-5", isDarkMode ? "text-gray-400" : "text-gray-600")} />
+                                                                <span className={clsx("text-sm", isDarkMode ? "text-gray-400" : "text-gray-500")}>
+                                                                    Unlocks: {new Date(vault.unlocks_on).toLocaleString()}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -680,56 +714,41 @@ export default function NomineePage() {
                                     </div>
                                 )}
 
-                                {/* Vaults Shared With Me */}
+                                {/* Unlocked Vaults Shared With Me */}
                                 {myNomineeFileAssets.length > 0 && (
                                     <div>
                                         <h3 className={clsx("text-xl font-semibold mb-4 flex items-center", isDarkMode ? "text-white" : "text-gray-900")}>
                                             <ShieldCheckIcon className="w-5 h-5 mr-2" />
-                                            Vaults Shared With Me
+                                            Unlocked Vaults (Shared With Me)
                                         </h3>
                                         <div className="grid gap-4">
-                                            {myNomineeFileAssets.map((asset) => (
+                                            {myNomineeFileAssets.map((asset: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                                                 <div key={asset.id} className={clsx(
                                                     "border rounded-lg p-4 hover:shadow-md transition-shadow",
                                                     isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
                                                 )}>
                                                     <div className="flex items-center justify-between">
-                                                        <div className="flex items-center space-x-3">
-                                                            {React.createElement(getFileIcon(asset.fileType), { className: clsx("w-8 h-8", isDarkMode ? "text-gray-400" : "text-gray-600") })}
-                                                            <div>
-                                                                <p className={clsx("font-medium", isDarkMode ? "text-white" : "text-gray-900")}>{asset.title}</p>
-                                                                <p className={clsx("text-sm", isDarkMode ? "text-gray-400" : "text-gray-500")}>{asset.description}</p>
-                                                                {asset.fileName && (
-                                                                    <p className={clsx("text-xs", isDarkMode ? "text-gray-500" : "text-gray-400")}>{asset.fileName} • {formatFileSize(asset.fileSize)}</p>
-                                                                )}
-                                                                {asset.ipfsHash && (
-                                                                    <p className={clsx("text-xs", isDarkMode ? "text-blue-400" : "text-blue-600")}>
-                                                                        🌐 IPFS: {asset.ipfsHash.substring(0, 10)}...{asset.ipfsHash.substring(asset.ipfsHash.length - 8)}
-                                                                    </p>
-                                                                )}
-                                                            </div>
+                                                        <div>
+                                                            <p className={clsx("font-medium", isDarkMode ? "text-white" : "text-gray-900")}>
+                                                                Owner: {asset.owner.address.substring(0, 10)}...{asset.owner.address.substring(asset.owner.address.length - 8)}
+                                                            </p>
                                                         </div>
-                                                        <div className="text-right">
-                                                            <div className="flex items-center space-x-2 mb-2">
-                                                                <ClockIcon className={clsx("w-4 h-4", isDarkMode ? "text-gray-500" : "text-gray-400")} />
-                                                                <span className={clsx("text-sm", isDarkMode ? "text-gray-400" : "text-gray-500")}>
-                                                                    {asset.status === 'unlocked' ? 'Unlocked' : 'Unlocks ' + asset.unlockTime.toLocaleDateString()}
-                                                                </span>
-                                                            </div>
-                                                            {asset.status === 'unlocked' && (
-                                                                <button
-                                                                    onClick={() => downloadFile(asset)}
-                                                                    className={clsx(
-                                                                        "inline-flex items-center px-3 py-1 text-sm rounded-md transition-colors",
-                                                                        isDarkMode
-                                                                            ? "bg-white text-gray-900 hover:bg-gray-100"
-                                                                            : "bg-black text-white hover:bg-gray-800"
-                                                                    )}
-                                                                >
-                                                                    <ArrowDownTrayIcon className="w-4 h-4 mr-1" />
-                                                                    Download
-                                                                </button>
-                                                            )}
+                                                        <div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    console.log('Complete Vault Data:', asset);
+                                                                    alert('Check console for complete vault data!');
+                                                                }}
+                                                                className={clsx(
+                                                                    "inline-flex items-center px-3 py-1 text-sm rounded-md transition-colors",
+                                                                    isDarkMode
+                                                                        ? "bg-gray-600 text-white hover:bg-gray-500"
+                                                                        : "bg-gray-200 text-gray-700 hover:bg-gray-800"
+                                                                )}
+                                                            >
+                                                                <DocumentIcon className="w-4 h-4 mr-1" />
+                                                                View Raw Details
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 </div>
