@@ -16,8 +16,7 @@ export interface FileAsset {
   fileName: string;
   fileType: string;
   fileSize: number;
-  fileData: Uint8Array;
-  fileHash: string;
+  fileHash: string; // Unique hash instead of file data
   title: string;
   description: string;
   owner: string;
@@ -26,6 +25,7 @@ export interface FileAsset {
   status: 'locked' | 'unlocked';
   createdAt: Date;
   requestId?: number;
+  userRole?: 'owner' | 'nominee';
 }
 
 export const useNominee = () => {
@@ -88,7 +88,7 @@ export const useNominee = () => {
 
   // Add nominee field
   const addNominee = () => {
-    if (nominees.length < 5) {
+    if (nominees.length < 2) {
       setNominees([...nominees, ""]);
     }
   };
@@ -129,13 +129,14 @@ export const useNominee = () => {
         throw new Error("Please connect your wallet");
       }
 
-      if (!title.trim() || !description.trim()) {
-        throw new Error("Please fill in all fields");
+      if (!description.trim()) {
+        throw new Error("Please fill in the description field");
       }
 
-      if (!selectedFile) {
-        throw new Error("Please select a file to upload");
-      }
+      // Only generate file hash if user actually uploaded a file
+      const fileHash = selectedFile 
+        ? ethers.keccak256(ethers.toUtf8Bytes(selectedFile.name + selectedFile.size + Date.now()))
+        : null;
 
       const validNominees = nominees.filter(n => n.trim() && ethers.isAddress(n));
       if (validNominees.length === 0) {
@@ -164,31 +165,77 @@ export const useNominee = () => {
       
       const blockHeight = BigInt(currentBlock + blocksNeeded);
 
-      // Convert file to bytes
-      const fileBuffer = await selectedFile.arrayBuffer();
-      const fileBytes = new Uint8Array(fileBuffer);
+      // Create ULTRA-MINIMAL encryption payload - only essential data to stay under 256 bytes
+      const minimalEncryptionData = selectedFile ? {
+        d: description.substring(0, 50), // Increased description limit since no title
+        o: address, // Owner address
+        n: validNominees, // Nominees array
+        u: Math.floor(new Date(unlockDate).getTime() / 1000), // Unix timestamp
+        h: fileHash // Only include if file exists
+      } : {
+        d: description.substring(0, 50), // Increased description limit since no title
+        o: address, // Owner address
+        n: validNominees, // Nominees array
+        u: Math.floor(new Date(unlockDate).getTime() / 1000) // Unix timestamp
+        // No title, no fake file hash!
+      };
 
-      // Create the file asset data
-      const fileAssetData = {
-        fileName: selectedFile.name,
-        fileType: selectedFile.type,
-        fileSize: selectedFile.size,
-        fileData: Array.from(fileBytes), // Convert to array for JSON serialization
-        title,
-        description,
+      // Store full data separately for display purposes
+      const fullFileAssetData = {
+        fileName: selectedFile ? selectedFile.name : "No file uploaded",
+        fileType: selectedFile ? selectedFile.type : "text/plain",
+        fileSize: selectedFile ? selectedFile.size : 0,
+        fileHash: selectedFile ? minimalEncryptionData.h : null,
+        description, // Only description, no title
         owner: address,
         nominees: validNominees,
         unlockTime: unlockDate,
         createdAt: new Date().toISOString()
       };
 
-      const msgBytes = ethers.AbiCoder.defaultAbiCoder().encode(
-        ["string"],
-        [JSON.stringify(fileAssetData)]
-      );
-      const encodedMessage = getBytes(msgBytes);
+      // Send raw data without ABI encoding overhead
+      const rawData = {
+        d: description.substring(0, 35),
+        o: address,
+        n: validNominees.slice(0, 1), // Only 1 nominee
+        u: Math.floor(new Date(unlockDate).getTime() / 1000),
+        h: selectedFile ? fileHash : null
+      };
+      
+      const encodedMessage = ethers.toUtf8Bytes(JSON.stringify(rawData));
 
-      // Encrypt the file data using Blocklock.js
+      // Debug: Log what we're encrypting and its size
+      console.log("🔍 Encryption Debug:");
+      console.log("Flattened data:", {
+        description: description.substring(0, 50),
+        address,
+        nominees: validNominees,
+        timestamp: Math.floor(new Date(unlockDate).getTime() / 1000),
+        fileHash: selectedFile ? fileHash : "0x0000000000000000000000000000000000000000000000000000000000000000"
+      });
+      console.log("Encoded message length:", encodedMessage.length, "bytes");
+      
+      // Size breakdown for debugging
+      console.log("📊 Size Breakdown:");
+      console.log(`- Description (${description.substring(0, 35).length} chars): ${description.substring(0, 35).length} bytes`);
+      console.log(`- Owner address: ${address?.length || 0} bytes`);
+      console.log(`- Nominees (${validNominees.slice(0, 1).length} address): ${validNominees.slice(0, 1).reduce((acc, addr) => acc + (addr?.length || 0), 0)} bytes`);
+      console.log(`- Unix timestamp: ${Math.floor(new Date(unlockDate).getTime() / 1000).toString().length} bytes`);
+      if (selectedFile) {
+        console.log(`- File hash: ${fileHash ? fileHash.length : 0} bytes`);
+      } else {
+        console.log(`- File hash: 0 bytes (no placeholder)`);
+      }
+      console.log(`- JSON overhead: ~${encodedMessage.length - (description.substring(0, 35).length + (address?.length || 0) + validNominees.slice(0, 1).reduce((acc, addr) => acc + (addr?.length || 0), 0) + Math.floor(new Date(unlockDate).getTime() / 1000).toString().length + (selectedFile ? (fileHash ? fileHash.length : 0) : 0))} bytes`);
+      console.log(`- Total encoded: ${encodedMessage.length} bytes`);
+      console.log(`- ABI overhead eliminated! 🎉`);
+      
+      // Check message size before encryption
+      if (encodedMessage.length > 256) {
+        throw new Error(`Message too large: ${encodedMessage.length} bytes. Please reduce description length.`);
+      }
+
+      // Encrypt the metadata using Blocklock.js
       const blocklockjs = Blocklock.createFromChainId(signer, chainId);
       const cipherMessage = blocklockjs.encrypt(encodedMessage, blockHeight);
 
@@ -255,7 +302,6 @@ export const useNominee = () => {
           fileName: "important_document.pdf",
           fileType: "application/pdf",
           fileSize: 2048576, // 2MB
-          fileData: new Uint8Array(),
           fileHash: "0x1234567890abcdef",
           title: "Legal Documents",
           description: "Important legal documents and contracts",
@@ -270,7 +316,6 @@ export const useNominee = () => {
           fileName: "family_photos.zip",
           fileType: "application/zip",
           fileSize: 5242880, // 5MB
-          fileData: new Uint8Array(),
           fileHash: "0xabcdef1234567890",
           title: "Family Memories",
           description: "Personal family photos and videos",
@@ -290,7 +335,7 @@ export const useNominee = () => {
 
       return userFileAssets.map(asset => ({
         ...asset,
-        userRole: asset.owner.toLowerCase() === address.toLowerCase() ? 'owner' : 'nominee'
+        userRole: asset.owner.toLowerCase() === address.toLowerCase() ? ('owner' as const) : ('nominee' as const)
       }));
     }
   });
@@ -302,12 +347,16 @@ export const useNominee = () => {
   // Download file (when unlocked)
   const downloadFile = (asset: FileAsset) => {
     if (asset.status !== 'unlocked') {
-      alert("File is still locked. Wait until unlock time.");
+      alert("File is still locked.");
       return;
     }
-
-    // Create blob and download
-    const blob = new Blob([new Uint8Array(asset.fileData)], { type: asset.fileType });
+    
+    // Since we're not storing actual file data, show a message
+    alert(`File: ${asset.fileName}\nHash: ${asset.fileHash}\n\nNote: This is a demo. In production, files would be stored on IPFS or similar decentralized storage.`);
+    
+    // For demo purposes, create a placeholder file
+    const placeholderContent = `This is a placeholder for: ${asset.fileName}\nFile Hash: ${asset.fileHash}\nTitle: ${asset.title}\nDescription: ${asset.description}\nUnlock Time: ${asset.unlockTime}`;
+    const blob = new Blob([placeholderContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -331,8 +380,6 @@ export const useNominee = () => {
     // Form state
     activeTab,
     setActiveTab,
-    title,
-    setTitle,
     description,
     setDescription,
     nominees,
@@ -360,7 +407,7 @@ export const useNominee = () => {
     // User info
     userAddress: address,
     
-    // Validation
-    isValid: title.trim() && description.trim() && nominees.some(n => n.trim() && ethers.isAddress(n)) && unlockDate && selectedFile
+    // Validation - file upload is optional, only description required
+    isValid: description.trim() && nominees.some(n => n.trim() && ethers.isAddress(n)) && unlockDate
   };
 };

@@ -2,9 +2,9 @@
 import { useNominee } from "@/hooks/useNominee";
 import { Tab } from "@headlessui/react";
 import {
-    PlusIcon, XMarkIcon, ClockIcon, UserGroupIcon, DocumentTextIcon,
+    XMarkIcon, ClockIcon, UserGroupIcon, DocumentTextIcon,
     ShieldCheckIcon, DocumentIcon, PhotoIcon, FilmIcon, ArchiveBoxIcon, ArrowDownTrayIcon,
-    LockClosedIcon, KeyIcon, GlobeAltIcon, SparklesIcon, CalendarIcon
+    LockClosedIcon, KeyIcon, GlobeAltIcon, SparklesIcon, CalendarIcon, ExclamationTriangleIcon
 } from "@heroicons/react/24/outline";
 import { SunIcon, MoonIcon, WalletIcon } from "@heroicons/react/24/solid";
 import clsx from "clsx";
@@ -55,8 +55,8 @@ export default function NomineePage() {
     }, [isDarkMode]);
 
     const {
-        title, setTitle, description, setDescription, nominees,
-        unlockDate, setUnlockDate, addNominee, removeNominee, updateNominee,
+        description, setDescription, nominees,
+        unlockDate, setUnlockDate, removeNominee, updateNominee,
         createNomineeRequest, selectedFile, handleFileSelect, removeSelectedFile,
         myFileAssets, myNomineeFileAssets, userAddress, isValid, downloadFile, formatFileSize
     } = useNominee();
@@ -500,35 +500,20 @@ export default function NomineePage() {
                                         )}
                                     </div>
 
-                                    {/* Title */}
-                                    <div className="mb-6">
-                                        <label className={clsx("block text-sm font-medium mb-2", isDarkMode ? "text-gray-200" : "text-gray-700")}>
-                                            Vault Title *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={title}
-                                            onChange={(e) => setTitle(e.target.value)}
-                                            className={clsx(
-                                                "w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent",
-                                                isDarkMode
-                                                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                                                    : "bg-white border-gray-300 text-black placeholder-gray-500"
-                                            )}
-                                            placeholder="Enter a title for your vault"
-                                            required
-                                        />
-                                    </div>
+
 
                                     {/* Description */}
                                     <div className="mb-6">
                                         <label className={clsx("block text-sm font-medium mb-2", isDarkMode ? "text-gray-200" : "text-gray-700")}>
-                                            Description
+                                            Vault Description * <span className={clsx("text-xs font-normal", description.length > 35 ? "text-red-500" : "text-gray-500")}>
+                                                ({description.length}/35)
+                                            </span>
                                         </label>
                                         <textarea
                                             required
                                             value={description}
                                             onChange={(e) => setDescription(e.target.value)}
+                                            maxLength={35}
                                             rows={3}
                                             className={clsx(
                                                 "w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent",
@@ -536,14 +521,31 @@ export default function NomineePage() {
                                                     ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                                                     : "bg-white border-gray-300 text-black placeholder-gray-500"
                                             )}
-                                            placeholder="Describe what this vault contains"
+                                            placeholder="Describe what this vault contains (be specific)"
                                         />
+                                    </div>
+
+                                    {/* Size Warning */}
+                                    <div className={clsx("mb-6 p-4 rounded-lg border-2", isDarkMode ? "bg-yellow-900/20 border-yellow-700/50" : "bg-yellow-50 border-yellow-200")}>
+                                        <div className="flex items-start space-x-3">
+                                            <ExclamationTriangleIcon className={clsx("w-5 h-5 mt-0.5 flex-shrink-0", isDarkMode ? "text-yellow-400" : "text-yellow-600")} />
+                                            <div>
+                                                <h4 className={clsx("font-medium mb-1", isDarkMode ? "text-yellow-200" : "text-yellow-800")}>
+                                                    Encryption Size Limit
+                                                </h4>
+                                                <p className={clsx("text-sm", isDarkMode ? "text-yellow-300" : "text-yellow-700")}>
+                                                    <strong>Description:</strong> Keep under 35 characters<br/>
+                                                    <strong>Nominee:</strong> 1 wallet address only<br/>
+                                                    <strong>Why?</strong> Blocklock-js has a 256-byte encryption limit. Longer text will cause errors.
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* Nominees */}
                                     <div className="mb-6">
                                         <label className={clsx("block text-sm font-medium mb-2", isDarkMode ? "text-gray-200" : "text-gray-700")}>
-                                            Nominees (1-5 wallet addresses) *
+                                            Nominee (1 wallet address) *
                                         </label>
                                         <div className="space-y-3">
                                             {nominees.map((nominee, index) => (
@@ -573,21 +575,7 @@ export default function NomineePage() {
                                                 </div>
                                             ))}
                                         </div>
-                                        {nominees.length < 5 && (
-                                            <button
-                                                type="button"
-                                                onClick={addNominee}
-                                                className={clsx(
-                                                    "mt-3 inline-flex items-center px-3 py-2 border rounded-md text-sm font-medium",
-                                                    isDarkMode
-                                                        ? "border-gray-600 text-gray-300 bg-gray-700 hover:bg-gray-600"
-                                                        : "border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
-                                                )}
-                                            >
-                                                <PlusIcon className="w-4 h-4 mr-2" />
-                                                Add Nominee
-                                            </button>
-                                        )}
+
                                     </div>
 
                                     {/* Unlock Date */}
