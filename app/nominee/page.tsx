@@ -16,6 +16,7 @@ import Image from "next/image";
 export default function NomineePage() {
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [showCopied, setShowCopied] = useState(false);
+    const [showWalletMenu, setShowWalletMenu] = useState(false);
 
     // Toggle dark mode
     const toggleDarkMode = () => {
@@ -54,6 +55,18 @@ export default function NomineePage() {
             document.documentElement.classList.remove('dark');
         }
     }, [isDarkMode]);
+
+    // Close wallet menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (showWalletMenu && !(event.target as Element).closest('.wallet-menu-container')) {
+                setShowWalletMenu(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showWalletMenu]);
 
     const {
         description, setDescription, nominees,
@@ -374,31 +387,82 @@ export default function NomineePage() {
                                 {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
                             </button>
 
-                            {/* Compact Wallet Display */}
-                            {userAddress && (
-                                <div className="relative">
-                                    <div
-                                        className={clsx(
-                                            "flex items-center space-x-2 px-3 py-2 rounded-lg border cursor-pointer transition-all duration-200",
-                                            isDarkMode
-                                                ? "bg-gray-700 border-gray-600 hover:bg-gray-600"
-                                                : "bg-gray-50 border-gray-200 hover:bg-gray-100"
-                                        )}
-                                    >
-                                        <div className="relative">
-                                            <WalletIcon
-                                                onClick={() => copyToClipboard(userAddress)}
-                                                title="Click to copy address"
-                                                className={clsx(
-                                                    "w-6 h-6 cursor-pointer transition-transform duration-200 hover:scale-110",
-                                                    isDarkMode ? "text-white" : "text-black"
-                                                )}
-                                            />
-                                            <span className="absolute -top-1 -right-1 bg-green-500 w-3 h-3 rounded-full animate-pulse"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                                                         {/* Compact Wallet Display with Dropdown */}
+                             {userAddress && (
+                                 <div className="relative wallet-menu-container">
+                                     <div
+                                         className={clsx(
+                                             "flex items-center space-x-2 px-3 py-2 rounded-lg border cursor-pointer transition-all duration-200",
+                                             isDarkMode
+                                                 ? "bg-gray-700 border-gray-600 hover:bg-gray-600"
+                                                 : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                                         )}
+                                         onClick={() => setShowWalletMenu(!showWalletMenu)}
+                                     >
+                                         <div className="relative">
+                                             <WalletIcon
+                                                 className={clsx(
+                                                     "w-6 h-6 transition-transform duration-200",
+                                                     isDarkMode ? "text-white" : "text-black"
+                                                 )}
+                                             />
+                                             <span className="absolute -top-1 -right-1 bg-green-500 w-3 h-3 rounded-full animate-pulse"></span>
+                                         </div>
+                                     </div>
+
+                                     {/* Wallet Dropdown Menu */}
+                                     {showWalletMenu && (
+                                         <div className={clsx(
+                                             "absolute right-0 top-12 w-48 rounded-lg shadow-lg border z-50",
+                                             isDarkMode
+                                                 ? "bg-gray-800 border-gray-700"
+                                                 : "bg-white border-gray-200"
+                                         )}>
+                                             <div className="py-2">
+                                                 {/* Copy Address Option */}
+                                                 <button
+                                                     onClick={() => {
+                                                         copyToClipboard(userAddress);
+                                                         setShowWalletMenu(false);
+                                                     }}
+                                                     className={clsx(
+                                                         "w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2",
+                                                         isDarkMode
+                                                             ? "text-gray-200 hover:bg-gray-700"
+                                                             : "text-gray-700 hover:bg-gray-100"
+                                                     )}
+                                                 >
+                                                     <DocumentIcon className="w-4 h-4" />
+                                                     <span>Copy Address</span>
+                                                 </button>
+
+                                                 {/* Disconnect Option */}
+                                                 <button
+                                                     onClick={() => {
+                                                         // Use RainbowKit's disconnect method
+                                                         if (typeof window !== 'undefined') {
+                                                             // Clear local storage and reload to force disconnect
+                                                             localStorage.clear();
+                                                             sessionStorage.clear();
+                                                             window.location.reload();
+                                                         }
+                                                         setShowWalletMenu(false);
+                                                     }}
+                                                     className={clsx(
+                                                         "w-full px-4 py-2 text-left text-sm transition-colors flex items-center space-x-2",
+                                                         isDarkMode
+                                                             ? "text-red-400 hover:bg-gray-700"
+                                                             : "text-red-600 hover:bg-gray-100"
+                                                     )}
+                                                 >
+                                                     <XMarkIcon className="w-4 h-4" />
+                                                     <span>Disconnect</span>
+                                                 </button>
+                                             </div>
+                                         </div>
+                                     )}
+                                 </div>
+                             )}
                         </div>
                     </div>
                 </div>
@@ -531,18 +595,19 @@ export default function NomineePage() {
                                     </div>
 
                                     {/* Size Warning */}
-                                    <div className={clsx("mb-6 p-4 rounded-lg border-2", isDarkMode ? "bg-yellow-900/20 border-yellow-700/50" : "bg-yellow-50 border-yellow-200")}>
+                                    <div className={clsx("mb-6 p-3 rounded-lg border-2", )}>
                                         <div className="flex items-start space-x-3">
                                             <ExclamationTriangleIcon className={clsx("w-5 h-5 mt-0.5 flex-shrink-0", isDarkMode ? "text-yellow-400" : "text-yellow-600")} />
                                             <div>
-                                                <h4 className={clsx("font-medium mb-1", isDarkMode ? "text-yellow-200" : "text-yellow-800")}>
-                                                    Encryption Size Limit
+                                                <h4 className={clsx("font-medium mb-1", isDarkMode ? "text-white" : "text-gray-500")}>
+                                                    {/* Encryption Size Limit */}
+                                                    Blocklock-js has a 256-byte encryption limit. Longer text will cause errors.
                                                 </h4>
-                                                <p className={clsx("text-sm", isDarkMode ? "text-yellow-300" : "text-yellow-700")}>
+                                                {/* <p className={clsx("text-sm", isDarkMode ? "text-yellow-300" : "text-yellow-700")}>
                                                     <strong>Description:</strong> Keep under 35 characters<br/>
                                                     <strong>Nominee:</strong> 1 wallet address only<br/>
                                                     <strong>Why?</strong> Blocklock-js has a 256-byte encryption limit. Longer text will cause errors.
-                                                </p>
+                                                </p> */}
                                             </div>
                                         </div>
                                     </div>
