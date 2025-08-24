@@ -17,6 +17,7 @@
     "blocklock-solidity": "^0.0.13",
     "clsx": "^2.1.1",
     "ethers": "^6.15.0",
+    "ipfs-http-client": "^60.0.1",
     "lucide-react": "^0.479.0",
     "next": "15.3.0",
     "pino-pretty": "^11.2.2",

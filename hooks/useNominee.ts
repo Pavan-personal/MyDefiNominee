@@ -10,13 +10,15 @@ import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { BLOCKLOCK_CONTRACT_ABI, CONTRACT_ABI } from "@/lib/contract";
 import { useNetworkConfig } from "./useNetworkConfig";
+import { uploadToIPFS, downloadFromIPFS, isValidIPFSHash } from "../lib/ipfs";
 
 export interface FileAsset {
   id: string;
   fileName: string;
   fileType: string;
   fileSize: number;
-  fileHash: string; // Unique hash instead of file data
+  fileHash: string; // IPFS hash for real file storage
+  ipfsHash?: string; // IPFS hash for file content
   title: string;
   description: string;
   owner: string;
@@ -37,6 +39,15 @@ export const useNominee = () => {
   const [estimatedUnlockTime, setEstimatedUnlockTime] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  // Store created vaults in local state with persistence
+  const [createdVaults, setCreatedVaults] = useState<FileAsset[]>(() => {
+    // Load from localStorage on component mount
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('myVaults');
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
   
   const signer = useEthersSigner();
   const provider = useEthersProvider();
@@ -133,7 +144,15 @@ export const useNominee = () => {
         throw new Error("Please fill in the description field");
       }
 
-      // Only generate file hash if user actually uploaded a file
+      // Upload file to IPFS if user actually uploaded a file
+      let ipfsHash: string | null = null;
+      if (selectedFile) {
+        console.log("📤 Starting IPFS upload...");
+        ipfsHash = await uploadToIPFS(selectedFile);
+        console.log("✅ IPFS upload completed:", ipfsHash);
+      }
+
+      // Generate file hash for metadata
       const fileHash = selectedFile 
         ? ethers.keccak256(ethers.toUtf8Bytes(selectedFile.name + selectedFile.size + Date.now()))
         : null;
@@ -185,7 +204,8 @@ export const useNominee = () => {
         fileName: selectedFile ? selectedFile.name : "No file uploaded",
         fileType: selectedFile ? selectedFile.type : "text/plain",
         fileSize: selectedFile ? selectedFile.size : 0,
-        fileHash: selectedFile ? minimalEncryptionData.h : null,
+        fileHash: selectedFile ? fileHash : null, // File hash for metadata
+        ipfsHash: selectedFile ? ipfsHash : null, // IPFS hash for file content
         description, // Only description, no title
         owner: address,
         nominees: validNominees,
@@ -199,7 +219,7 @@ export const useNominee = () => {
         o: address,
         n: validNominees.slice(0, 1), // Only 1 nominee
         u: Math.floor(new Date(unlockDate).getTime() / 1000),
-        h: selectedFile ? fileHash : null
+        h: selectedFile ? ipfsHash : null // Use IPFS hash instead of file hash
       };
       
       const encodedMessage = ethers.toUtf8Bytes(JSON.stringify(rawData));
@@ -274,8 +294,34 @@ export const useNominee = () => {
 
       const receipt = await tx.wait(2);
 
+      // Create new vault asset
+      const newVault: FileAsset = {
+        id: Date.now().toString(),
+        fileName: selectedFile ? selectedFile.name : "No file uploaded",
+        fileType: selectedFile ? selectedFile.type : "text/plain",
+        fileSize: selectedFile ? selectedFile.size : 0,
+        fileHash: fileHash || "0x0000000000000000000000000000000000000000000000000000000000000000",
+        ipfsHash: ipfsHash || undefined,
+        title: "Vault", // Default title since we removed title field
+        description: description,
+        owner: address!,
+        nominees: validNominees,
+        unlockTime: new Date(unlockDate),
+        status: 'locked' as const,
+        createdAt: new Date()
+      };
+
+      // Add to created vaults
+      setCreatedVaults(prev => {
+        const updated = [...prev, newVault];
+        // Save to localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('myVaults', JSON.stringify(updated));
+        }
+        return updated;
+      });
+
       // Reset form
-      setTitle("");
       setDescription("");
       setNominees([""]);
       setUnlockDate("");
@@ -284,13 +330,15 @@ export const useNominee = () => {
       setUploadProgress(0);
       setActiveTab("dashboard");
 
+      console.log("✅ Vault created successfully:", newVault);
+
       return receipt;
     },
   });
 
   // Get file assets based on user role
   const { data: fileAssets = [] } = useQuery({
-    queryKey: ['fileAssets', address],
+    queryKey: ['fileAssets', address, createdVaults],
     queryFn: async () => {
       if (!address) return [];
       
@@ -303,10 +351,11 @@ export const useNominee = () => {
           fileType: "application/pdf",
           fileSize: 2048576, // 2MB
           fileHash: "0x1234567890abcdef",
+          ipfsHash: "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG", // Sample IPFS hash
           title: "Legal Documents",
           description: "Important legal documents and contracts",
           owner: "0x1234567890123456789012345678901234567890",
-          nominees: ["0x2345678901234567890123456789012345678901", "0x3456789012345678901234567890123456789012"],
+          nominees: ["0x2345678901234567890123456789012345678901"],
           unlockTime: new Date(Date.now() + 86400000), // 24 hours from now
           status: 'locked' as const,
           createdAt: new Date()
@@ -317,18 +366,22 @@ export const useNominee = () => {
           fileType: "application/zip",
           fileSize: 5242880, // 5MB
           fileHash: "0xabcdef1234567890",
+          ipfsHash: "QmW2WQi7j6c7UgJTarActp7tDNikE4B2qXtBCf8BBY9zX", // Sample IPFS hash
           title: "Family Memories",
           description: "Personal family photos and videos",
           owner: "0x4567890123456789012345678901234567890123",
-          nominees: ["0x1234567890123456789012345678901234567890", "0x5678901234567890123456789012345678901234"],
+          nominees: ["0x1234567890123456789012345678901234567890"],
           unlockTime: new Date(Date.now() - 86400000), // 24 hours ago (unlocked)
           status: 'unlocked' as const,
           createdAt: new Date(Date.now() - 172800000) // 2 days ago
         }
       ];
 
+      // Combine mock data with created vaults
+      const allAssets = [...mockFileAssets, ...createdVaults];
+
       // Filter based on user role
-      const userFileAssets = mockFileAssets.filter(asset => 
+      const userFileAssets = allAssets.filter(asset => 
         asset.owner.toLowerCase() === address.toLowerCase() || 
         asset.nominees.some(nominee => nominee.toLowerCase() === address.toLowerCase())
       );
@@ -345,26 +398,35 @@ export const useNominee = () => {
   const myNomineeFileAssets = fileAssets.filter(asset => asset.userRole === 'nominee');
 
   // Download file (when unlocked)
-  const downloadFile = (asset: FileAsset) => {
+  const downloadFile = async (asset: FileAsset) => {
     if (asset.status !== 'unlocked') {
       alert("File is still locked.");
       return;
     }
     
-    // Since we're not storing actual file data, show a message
-    alert(`File: ${asset.fileName}\nHash: ${asset.fileHash}\n\nNote: This is a demo. In production, files would be stored on IPFS or similar decentralized storage.`);
-    
-    // For demo purposes, create a placeholder file
-    const placeholderContent = `This is a placeholder for: ${asset.fileName}\nFile Hash: ${asset.fileHash}\nTitle: ${asset.title}\nDescription: ${asset.description}\nUnlock Time: ${asset.unlockTime}`;
-    const blob = new Blob([placeholderContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = asset.fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      if (asset.ipfsHash && isValidIPFSHash(asset.ipfsHash)) {
+        // Download real file from IPFS
+        console.log(`📥 Downloading ${asset.fileName} from IPFS: ${asset.ipfsHash}`);
+        await downloadFromIPFS(asset.ipfsHash, asset.fileName);
+      } else {
+        // Fallback to placeholder for demo purposes
+        console.log("⚠️ No IPFS hash found, creating placeholder file");
+        const placeholderContent = `This is a placeholder for: ${asset.fileName}\nFile Hash: ${asset.fileHash}\nDescription: ${asset.description}\nUnlock Time: ${asset.unlockTime}\n\nNote: This is a demo. In production, files would be stored on IPFS.`;
+        const blob = new Blob([placeholderContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = asset.fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error("❌ Download failed:", error);
+      alert(`Download failed: ${error}`);
+    }
   };
 
   // Format file size

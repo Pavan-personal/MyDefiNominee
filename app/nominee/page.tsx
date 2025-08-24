@@ -459,7 +459,7 @@ export default function NomineePage() {
                                     {/* File Upload Component (Optional) */}
                                     <div className="mb-6">
                                         <label className={clsx("block text-sm font-medium mb-2", isDarkMode ? "text-gray-200" : "text-gray-700")}>
-                                            Attach File (Optional) - Max 10MB
+                                            Attach File (Optional) - Max 10MB - Will be stored on IPFS
                                         </label>
                                         {!selectedFile ? (
                                             <div className={clsx("border-2 border-dashed rounded-lg p-6 text-center hover:border-gray-400 transition-colors", isDarkMode ? "border-gray-600" : "border-gray-300")}>
@@ -654,6 +654,11 @@ export default function NomineePage() {
                                                                 {asset.fileName && (
                                                                     <p className={clsx("text-xs", isDarkMode ? "text-gray-500" : "text-gray-400")}>{asset.fileName} • {formatFileSize(asset.fileSize)}</p>
                                                                 )}
+                                                                {asset.ipfsHash && (
+                                                                    <p className={clsx("text-xs", isDarkMode ? "text-blue-400" : "text-blue-600")}>
+                                                                        🌐 IPFS: {asset.ipfsHash.substring(0, 10)}...{asset.ipfsHash.substring(asset.ipfsHash.length - 8)}
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
@@ -696,6 +701,11 @@ export default function NomineePage() {
                                                                 <p className={clsx("text-sm", isDarkMode ? "text-gray-400" : "text-gray-500")}>{asset.description}</p>
                                                                 {asset.fileName && (
                                                                     <p className={clsx("text-xs", isDarkMode ? "text-gray-500" : "text-gray-400")}>{asset.fileName} • {formatFileSize(asset.fileSize)}</p>
+                                                                )}
+                                                                {asset.ipfsHash && (
+                                                                    <p className={clsx("text-xs", isDarkMode ? "text-blue-400" : "text-blue-600")}>
+                                                                        🌐 IPFS: {asset.ipfsHash.substring(0, 10)}...{asset.ipfsHash.substring(asset.ipfsHash.length - 8)}
+                                                                    </p>
                                                                 )}
                                                             </div>
                                                         </div>
