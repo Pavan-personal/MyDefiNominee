@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      console.log(`🔓 Attempting to decrypt vault ${vaultId} for user ${userAddress}`)
-      console.log(`📋 Blockchain ID: ${vault.blockchainId}`)
+      console.log(`Attempting to decrypt vault ${vaultId} for user ${userAddress}`)
+      console.log(`Blockchain ID: ${vault.blockchainId}`)
       
       // In a real implementation, you would:
       // 1. Get the ciphertext from the blockchain using the vault's blockchainId
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
         ipfsHash: vault.ipfsHash
       }
       
-      console.log('✅ Vault decrypted successfully:', decryptedData)
+      console.log('Vault decrypted successfully:', decryptedData)
       
     } catch (decryptError) {
       console.error('Decryption failed:', decryptError)

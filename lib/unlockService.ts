@@ -11,7 +11,7 @@ class UnlockService {
       await this.checkForUnlocks();
     }, 30000); // Check every 30 seconds
     
-    console.log('🔓 Unlock service started');
+    console.log('Unlock service started');
   }
 
   stop() {
@@ -30,7 +30,7 @@ class UnlockService {
       if (response.ok) {
         const { unlockedVaults } = await response.json();
         if (unlockedVaults && unlockedVaults.length > 0) {
-          console.log(`🔓 Found ${unlockedVaults.length} newly unlocked vaults`);
+          console.log(`Found ${unlockedVaults.length} newly unlocked vaults`);
           // Trigger UI refresh for connected clients
           this.notifyUnlocks(unlockedVaults);
         }
@@ -51,7 +51,7 @@ class UnlockService {
   }>) {
     // In a real app, you'd use WebSockets or Server-Sent Events
     // For now, we'll rely on the 30-second polling in the UI
-    console.log('🔓 Unlocked vaults:', unlockedVaults);
+    console.log('Unlocked vaults:', unlockedVaults);
   }
 }
 

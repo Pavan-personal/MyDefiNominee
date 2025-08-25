@@ -59,7 +59,7 @@ export async function GET() {
       })
     )
 
-    console.log(`🔓 Unlocked ${updatedVaults.length} vaults`)
+    console.log(`Unlocked ${updatedVaults.length} vaults`)
 
     return NextResponse.json({ 
       unlockedVaults: updatedVaults,

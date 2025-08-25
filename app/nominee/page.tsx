@@ -1,13 +1,5 @@
 "use client";
 
-// Extend Window interface for download functions
-declare global {
-    interface Window {
-        downloadImage: (imageUrl: string, fileName: string) => void;
-        downloadTextFile: (fileData: string | number[], fileName: string, mimeType: string) => void;
-    }
-}
-
 import { useNominee, FileAsset } from "@/hooks/useNominee";
 import "@/lib/unlockService"; // Import unlock service for background unlock detection
 import { ethers } from "ethers";
@@ -38,6 +30,14 @@ export default function NomineePage() {
     const [showFileContent, setShowFileContent] = useState(false);
     const [fileContent, setFileContent] = useState<string>("");
     const [isLoadingFile, setIsLoadingFile] = useState(false);
+    const [showVaultSuccess, setShowVaultSuccess] = useState(false);
+    const [vaultSuccessMessage, setVaultSuccessMessage] = useState("");
+    const [fileData, setFileData] = useState<{
+        data: string | Uint8Array;
+        type: string;
+        size: number;
+        name: string;
+    } | null>(null);
 
     // Toggle dark mode
     const toggleDarkMode = () => {
@@ -79,36 +79,7 @@ export default function NomineePage() {
 
     // Add download functions to window
     useEffect(() => {
-        window.downloadImage = (imageUrl: string, fileName: string): void => {
-            const a = document.createElement('a');
-            a.href = imageUrl;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        };
-        
-        window.downloadTextFile = (fileData: string | number[], fileName: string, mimeType: string): void => {
-            let blob: Blob;
-            
-            if (Array.isArray(fileData)) {
-                // Binary data (array of numbers)
-                const uint8Array = new Uint8Array(fileData);
-                blob = new Blob([uint8Array], { type: mimeType });
-            } else {
-                // Text data
-                blob = new Blob([fileData], { type: mimeType });
-            }
-            
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        };
+        // No longer needed - using inline download functionality in React components
     }, []);
 
     // Close wallet menu when clicking outside
@@ -148,221 +119,42 @@ export default function NomineePage() {
         setIsLoadingFile(true);
         try {
             if (asset.ipfsHash) {
-                console.log(`🔍 Fetching file from IPFS: ${asset.ipfsHash}`);
+                console.log(`Fetching file from IPFS: ${asset.ipfsHash}`);
                 
                 // Import the IPFS function
                 const { fetchFileFromIPFS } = await import('../../lib/ipfs');
                 
                 // Fetch file from real IPFS
-                const fileData = await fetchFileFromIPFS(asset.ipfsHash, asset.fileName);
+                const fetchedFileData = await fetchFileFromIPFS(asset.ipfsHash, asset.fileName);
                 
-                console.log(`✅ File fetched from IPFS:`, fileData);
-                console.log(`📁 File type: ${fileData.type}, size: ${fileData.size} bytes`);
+                console.log(`File fetched from IPFS:`, fetchedFileData);
+                console.log(`File type: ${fetchedFileData.type}, size: ${fetchedFileData.size} bytes`);
                 
                 const fileExtension = asset.fileName?.split('.').pop()?.toLowerCase();
                 
                 // Validate file type - only support the 5 specified types
                 const supportedTypes = ['png', 'jpg', 'jpeg', 'pdf', 'txt'];
                 if (!fileExtension || !supportedTypes.includes(fileExtension)) {
-                    setFileContent(`
-                        <div style="text-align: center; padding: 20px;">
-                            <h3 style="margin-bottom: 20px; color: #ef4444;">❌ Unsupported File Type: ${asset.fileName}</h3>
-                            <div style="background: #fef2f2; border: 2px solid #ef4444; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                                <p style="color: #dc2626; font-weight: 500;">
-                                    Only PNG, JPG, JPEG, PDF, and TXT files are supported.
-                                </p>
-                                <p style="color: #6b7280; margin-top: 10px;">
-                                    File type detected: ${fileExtension || 'Unknown'}
-                                </p>
-                            </div>
-                        </div>
-                    `);
+                    setFileContent('unsupported');
+                    setFileData(null);
                     setShowFileContent(true);
                     return;
                 }
                 
-                // Handle different file types - ONLY the 5 supported types
-                if (fileExtension === 'png' || fileExtension === 'jpg' || fileExtension === 'jpeg') {
-                    // For images, create a proper blob and display the actual image
-                    try {
-                        // Convert the fetched data to a blob
-                        const imageBlob = new Blob([fileData.data as BlobPart], { type: fileData.type });
-                        const imageUrl = URL.createObjectURL(imageBlob);
-                        
-                        const imageContent = `
-                            <div style="text-align: center; padding: 20px;">
-                                <h3 style="margin-bottom: 20px; color: #3B82F6;">🖼️ Your Actual Image: ${asset.fileName}</h3>
-                                <div style="background: #f3f4f6; border: 2px solid #10B981; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                                    <img src="${imageUrl}" alt="${asset.fileName}" style="max-width: 100%; max-height: 400px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" />
-                                    <p style="color: #059669; font-weight: 500; margin-top: 15px;">
-                                        ✅ Your actual image loaded from IPFS! Size: ${(fileData.size / 1024).toFixed(1)} KB
-                                    </p>
-                                </div>
-                                <div style="margin-top: 20px; padding: 15px; background: #dbeafe; border-radius: 6px; border-left: 4px solid #3B82F6;">
-                                    <p style="color: #1e40af; margin: 0; font-size: 14px;">
-                                        <strong>🔗 IPFS Hash:</strong> ${asset.ipfsHash}<br/>
-                                        <strong>📁 File Type:</strong> ${fileData.type}<br/>
-                                        <strong>📊 File Size:</strong> ${(fileData.size / 1024).toFixed(1)} KB<br/>
-                                        <strong>🌐 Source:</strong> IPFS Network
-                                    </p>
-                                    <div style="margin-top: 10px;">
-                                        <button onclick="downloadImage('${imageUrl}', '${asset.fileName}')" style="background: #3B82F6; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                                            📥 Download Image
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                        
-                        setFileContent(imageContent);
-                        setShowFileContent(true);
-                    } catch (imageError) {
-                        console.error('Error displaying image:', imageError);
-                        // Fallback to info display
-                        const fallbackContent = `
-                            <div style="text-align: center; padding: 20px;">
-                                <h3 style="margin-bottom: 20px; color: #3B82F6;">🖼️ Image File: ${asset.fileName}</h3>
-                                <div style="background: #f3f4f6; border: 2px solid #10B981; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                                    <p style="color: #059669; font-weight: 500; margin-top: 15px;">
-                                        ✅ Image file loaded from IPFS! Size: ${(fileData.size / 1024).toFixed(1)} KB
-                                    </p>
-                                    <p style="color: #6b7280; margin-top: 10px;">
-                                        Click download to get your actual image file.
-                                    </p>
-                                </div>
-                                <div style="margin-top: 20px; padding: 15px; background: #dbeafe; border-radius: 6px; border-left: 4px solid #3B82F6;">
-                                    <button onclick="downloadTextFile('${Array.from(fileData.data as Uint8Array)}', '${asset.fileName}', '${fileData.type}')" style="background: #3B82F6; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                                        📥 Download Image
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                        setFileContent(fallbackContent);
-                        setShowFileContent(true);
-                    }
-                } else if (fileExtension === 'pdf') {
-                    // For PDFs, show info and download button
-                    const content = `
-                        <div style="text-align: center; padding: 20px;">
-                            <h3 style="margin-bottom: 20px; color: #3B82F6;">📄 PDF Document: ${asset.fileName}</h3>
-                            <div style="background: #f3f4f6; border: 2px solid #10B981; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                                <div style="background: #e5e7eb; border-radius: 6px; padding: 40px; margin: 20px 0; text-align: center;">
-                                    <p style="color: #374151; font-size: 48px; margin: 0;">📄</p>
-                                    <p style="color: #6b7280; font-size: 16px; margin: 10px 0 0 0;">
-                                        PDF: ${asset.fileName}
-                                    </p>
-                                </div>
-                                <p style="color: #059669; font-weight: 500; margin-top: 15px;">
-                                    ✅ PDF file loaded from IPFS! Size: ${(fileData.size / 1024).toFixed(1)} KB
-                                </p>
-                            </div>
-                            <div style="margin-top: 20px; padding: 15px; background: #dbeafe; border-radius: 6px; border-left: 4px solid #3B82F6;">
-                                <button onclick="downloadTextFile('${Array.from(fileData.data as Uint8Array)}', '${asset.fileName}', '${fileData.type}')" style="background: #3B82F6; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                                    📥 Download PDF
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    setFileContent(content);
-                    setShowFileContent(true);
-                } else if (fileExtension === 'txt') {
-                    // For text files, show actual content
-                    const content = `
-                        <div style="text-align: center; padding: 20px;">
-                            <h3 style="margin-bottom: 20px; color: #3B82F6;">📝 Text File: ${asset.fileName}</h3>
-                            <div style="background: #f3f4f6; border: 2px solid #10B981; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                                <h4 style="color: #059669; margin-bottom: 15px;">📄 File Content:</h4>
-                                <pre style="background: #ffffff; padding: 15px; border-radius: 6px; margin: 10px 0; white-space: pre-wrap; font-family: monospace; font-size: 12px; text-align: left; max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb;">${fileData.data}</pre>
-                                <p style="color: #059669; font-weight: 500; margin-top: 15px;">
-                                    ✅ Text file loaded from IPFS! Size: ${(fileData.size / 1024).toFixed(1)} KB
-                                </p>
-                            </div>
-                            <div style="margin-top: 20px; padding: 15px; background: #dbeafe; border-radius: 6px; border-left: 4px solid #3B82F6;">
-                                <button onclick="downloadTextFile('${fileData.data}', '${asset.fileName}', '${fileData.type}')" style="background: #3B82F6; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                                    📥 Download Text File
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    setFileContent(content);
-                    setShowFileContent(true);
-                } else {
-                    // For unsupported file types, show info and download
-                    const content = `
-                        <div style="text-align: center; padding: 20px;">
-                            <h3 style="margin-bottom: 20px; color: #3B82F6;">📁 File: ${asset.fileName}</h3>
-                            <div style="background: #f3f4f6; border: 2px solid #10B981; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                                <div style="background: #e5e7eb; border-radius: 6px; padding: 40px; margin: 20px 0; text-align: center;">
-                                    <p style="color: #374151; font-size: 48px; margin: 0;">📁</p>
-                                    <p style="color: #6b7280; font-size: 16px; margin: 10px 0 0 0;">
-                                        File: ${asset.fileName}
-                                    </p>
-                                </div>
-                                <p style="color: #059669; font-weight: 500; margin-top: 15px;">
-                                    ✅ File loaded from IPFS! Size: ${(fileData.size / 1024).toFixed(1)} KB
-                                </p>
-                                <p style="color: #6b7280; margin-top: 10px;">
-                                    File type: ${fileData.type}
-                                </p>
-                            </div>
-                            <div style="margin-top: 20px; padding: 15px; background: #dbeafe; border-radius: 6px; border-left: 4px solid #3B82F6;">
-                                <button onclick="downloadTextFile('${Array.from(fileData.data as Uint8Array)}', '${asset.fileName}', '${fileData.type}')" style="background: #3B82F6; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
-                                    📥 Download File
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    setFileContent(content);
-                    setShowFileContent(true);
-                }
+                // Store the file data and type for proper component rendering
+                setFileData(fetchedFileData);
+                setFileContent(fileExtension);
+                setShowFileContent(true);
             } else {
                 // No hash
-                setFileContent(`
-                    <div style="text-align: center; padding: 20px;">
-                        <h3 style="margin-bottom: 20px; color: #ef4444;">❌ No hash available for: ${asset.fileName}</h3>
-                        <div style="background: #fef2f2; border: 2px solid #ef4444; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                            <p style="color: #dc2626; font-weight: 500;">
-                                This file doesn't have an IPFS hash, so we can't retrieve the actual content.
-                            </p>
-                        </div>
-                    </div>
-                `);
+                setFileContent('no-hash');
+                setFileData(null);
                 setShowFileContent(true);
             }
         } catch (error) {
-            console.error('❌ Error fetching file from IPFS:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            setFileContent(`
-                <div style="text-align: center; padding: 20px;">
-                    <h3 style="margin-bottom: 20px; color: #ef4444;">❌ Failed to load file from IPFS</h3>
-                    <div style="background: #fef2f2; border: 2px solid #ef4444; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                        <p style="color: #dc2626; font-weight: 500; margin-bottom: 15px;">
-                            Error: ${errorMessage}
-                        </p>
-                        <div style="text-align: left; background: #ffffff; padding: 15px; border-radius: 6px; margin: 10px 0;">
-                            <p><strong>File:</strong> ${asset.fileName}</p>
-                            <p><strong>IPFS Hash:</strong> ${asset.ipfsHash || 'None'}</p>
-                            <p><strong>Debug Info:</strong></p>
-                            <ul style="margin: 10px 0; padding-left: 20px;">
-                                <li>Hash starts with: ${asset.ipfsHash?.substring(0, 10)}...</li>
-                                <li>Hash length: ${asset.ipfsHash?.length || 0} characters</li>
-                                <li>Expected format: Qm... or bafy...</li>
-                            </ul>
-                        </div>
-                        <p style="color: #dc2626; margin-top: 15px;">
-                            This could mean the file hash is invalid, the file was never uploaded to IPFS, or there are network connectivity issues.
-                        </p>
-                        <div style="margin-top: 15px; padding: 15px; background: #fef3c7; border-radius: 6px; border-left: 4px solid #f59e0b;">
-                            <p style="color: #92400e; margin: 0; font-size: 14px;">
-                                <strong>💡 Note:</strong> This system now uses real IPFS fetching. If you're seeing this error, it means the file needs to be uploaded to a real IPFS service.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            `);
+            console.error('Error fetching file from IPFS:', error);
+            setFileContent('error');
+            setFileData(null);
             setShowFileContent(true);
         } finally {
             setIsLoadingFile(false);
@@ -384,13 +176,13 @@ export default function NomineePage() {
         setDecryptingVaultId(vault.id);
         
         try {
-            console.log(`🔓 Starting Blocklock decryption for vault ${vault.id}`);
-            console.log(`📋 Vault data:`, vault);
-            console.log(`📋 Blockchain ID: ${vault.blockchainId}`);
+            console.log(`Starting Blocklock decryption for vault ${vault.id}`);
+            console.log(`Vault data:`, vault);
+            console.log(`Blockchain ID: ${vault.blockchainId}`);
             
             // Get current block height
             const currentBlock = await provider.getBlockNumber();
-            console.log(`📊 Current block: ${currentBlock}`);
+            console.log(`Current block: ${currentBlock}`);
             
             // Get the encrypted data from the database
             if (!vault.encryptedData) {
@@ -399,7 +191,7 @@ export default function NomineePage() {
             
             // Parse the encrypted data (it's stored as a hex string)
             const encryptedBytes = ethers.getBytes(vault.encryptedData);
-            console.log(`🔒 Encrypted data length: ${encryptedBytes.length} bytes`);
+            console.log(`Encrypted data length: ${encryptedBytes.length} bytes`);
             
             // For now, we'll use the stored encrypted data directly since it contains the vault information
             let decryptedData;
@@ -412,7 +204,7 @@ export default function NomineePage() {
                 decryptedData = { description: ethers.toUtf8String(encryptedBytes) };
             }
             
-            console.log('✅ Blocklock decryption successful:', decryptedData);
+            console.log('Blocklock decryption successful:', decryptedData);
             
             // Show success message with decrypted description
             const description = decryptedData.d || decryptedData.description || 'Decrypted successfully';
@@ -446,7 +238,12 @@ export default function NomineePage() {
         unlockDate, setUnlockDate, removeNominee, updateNominee,
         createNomineeRequest, selectedFile, handleFileSelect, removeSelectedFile,
         myFileAssets, myNomineeFileAssets, userAddress, isValid, formatFileSize
-    } = useNominee();
+    } = useNominee(() => {
+        // Vault creation success callback
+        setVaultSuccessMessage("Vault created successfully!");
+        setShowVaultSuccess(true);
+        setTimeout(() => setShowVaultSuccess(false), 5000);
+    });
 
     // Get blockchain connection details
     const signer = useEthersSigner();
@@ -865,11 +662,22 @@ export default function NomineePage() {
                         <div className={clsx(
                             "px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 animate-bounce",
                             isDecryptError 
-                                ? "bg-red-600 text-white" 
-                                : "bg-green-600 text-white"
+                                ? "bg-black text-white" 
+                                : "bg-black text-white"
                         )}>
                             <div className="w-2 h-2 rounded-full animate-pulse transition-all duration-300 bg-white"></div>
                             <span className="font-medium">{decryptSuccessMessage}</span>
+                            <div className="w-2 h-2 rounded-full animate-pulse transition-all duration-300 delay-100 bg-white"></div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Vault Creation Success Notification */}
+                {showVaultSuccess && (
+                    <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+                        <div className="bg-black text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 animate-bounce">
+                            <div className="w-2 h-2 rounded-full animate-pulse transition-all duration-300 bg-white"></div>
+                            <span className="font-medium">{vaultSuccessMessage}</span>
                             <div className="w-2 h-2 rounded-full animate-pulse transition-all duration-300 delay-100 bg-white"></div>
                         </div>
                     </div>
@@ -1178,7 +986,7 @@ export default function NomineePage() {
                                                                 </p>
                                                                 {new Date(vault.unlocks_on) > new Date() && (
                                                                     <p className={clsx("text-xs mt-1", isDarkMode ? "text-yellow-400" : "text-yellow-600")}>
-                                                                        ⏰ {Math.ceil((new Date(vault.unlocks_on).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days remaining
+                                                                        {Math.ceil((new Date(vault.unlocks_on).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days remaining
                                                                     </p>
                                                                 )}
                                                             </div>
@@ -1205,7 +1013,7 @@ export default function NomineePage() {
                                                                         )}
                                                                     >
                                                                         <KeyIcon className="w-4 h-4 mr-2" />
-                                                                        {decryptingVaultId === vault.id ? "Decrypting..." : "🔓 Decrypt Now"}
+                                                                        {decryptingVaultId === vault.id ? "Decrypting..." : "Decrypt Now"}
                                                                     </button>
                                                                 )}
                                                             </div>
@@ -1244,7 +1052,7 @@ export default function NomineePage() {
                                                                         "inline-flex items-center px-3 py-1 text-sm rounded-md transition-colors",
                                                                         isDarkMode
                                                                             ? "bg-gray-600 text-white hover:bg-gray-500"
-                                                                            : "bg-gray-200 text-gray-700 hover:bg-gray-800"
+                                                                            : "bg-gray-200 text-gray-700 hover:bg-gray-800 hover:text-white"
                                                                     )}
                                                                 >
                                                                     <DocumentIcon className="w-4 h-4 mr-1" />
@@ -1301,10 +1109,196 @@ export default function NomineePage() {
                                 ? "bg-gray-900 border-gray-600 text-gray-100" 
                                 : "bg-gray-50 border-gray-300 text-gray-800"
                         )}>
-                            {fileContent.includes('<div') ? (
-                                <div dangerouslySetInnerHTML={{ __html: fileContent }} />
-                            ) : (
-                                <pre className="whitespace-pre-wrap break-words">{fileContent}</pre>
+                            {fileContent === 'unsupported' && (
+                                <div className="text-center p-5">
+                                    <h3 className="text-xl font-semibold mb-5 text-black">Unsupported File Type: {selectedVault?.fileName}</h3>
+                                    <div className="bg-gray-100 border-2 border-black rounded-lg p-5 m-5">
+                                        <p className="text-black font-medium">
+                                            Only PNG, JPG, JPEG, PDF, and TXT files are supported.
+                                        </p>
+                                        <p className="text-gray-600 mt-3">
+                                            File type detected: {selectedVault?.fileName?.split('.').pop() || 'Unknown'}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                            {fileContent === 'no-hash' && (
+                                <div className="text-center p-5">
+                                    <h3 className="text-xl font-semibold mb-5 text-black">No hash available for: {selectedVault?.fileName}</h3>
+                                    <div className="bg-gray-100 border-2 border-black rounded-lg p-5 m-5">
+                                        <p className="text-black font-medium">
+                                            This file doesn&apos;t have an IPFS hash, so we can&apos;t retrieve the actual content.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                            {fileContent === 'error' && (
+                                <div className="text-center p-5">
+                                    <h3 className="text-xl font-semibold mb-5 text-black">Failed to load file from IPFS</h3>
+                                    <div className="bg-gray-100 border-2 border-black rounded-lg p-5 m-5">
+                                        <p className="text-black font-medium">
+                                            Error: {decryptSuccessMessage}
+                                        </p>
+                                        <div className="text-left bg-white p-4 rounded-lg m-3 border border-gray-300">
+                                            <p className="text-black"><strong>File:</strong> {selectedVault?.fileName}</p>
+                                            <p className="text-black"><strong>IPFS Hash:</strong> {selectedVault?.ipfsHash || 'None'}</p>
+                                            <p className="text-black"><strong>Debug Info:</strong></p>
+                                            <ul className="m-0 p-0 text-black">
+                                                <li>Hash starts with: {selectedVault?.ipfsHash?.substring(0, 10)}...</li>
+                                                <li>Hash length: {selectedVault?.ipfsHash?.length || 0} characters</li>
+                                                <li>Expected format: Qm... or bafy...</li>
+                                            </ul>
+                                        </div>
+                                        <p className="text-black mt-3">
+                                            This could mean the file hash is invalid, the file was never uploaded to IPFS, or there are network connectivity issues.
+                                        </p>
+                                        <div className="mt-5 p-4 bg-gray-200 rounded-lg border-l-4 border-black">
+                                            <p className="text-black text-sm">
+                                                <strong>Note:</strong> This system now uses real IPFS fetching. If you&apos;re seeing this error, it means the file needs to be uploaded to a real IPFS service.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {fileContent !== 'unsupported' && fileContent !== 'no-hash' && fileContent !== 'error' && fileData && (
+                                <div className="text-center p-5">
+                                    {fileContent === 'png' || fileContent === 'jpg' || fileContent === 'jpeg' ? (
+                                        <div>
+                                            <h3 className="text-xl font-semibold mb-5 text-black">Image File: {selectedVault?.fileName}</h3>
+                                            <div className="bg-gray-100 border-2 border-black rounded-lg p-5 m-5">
+                                                <img 
+                                                    src={URL.createObjectURL(new Blob([fileData.data as BlobPart], { type: fileData.type }))} 
+                                                    alt={selectedVault?.fileName} 
+                                                    className="max-w-full max-h-96 rounded-lg shadow-lg mx-auto" 
+                                                />
+                                                <p className="text-black font-medium mt-4">
+                                                    Image file loaded from IPFS! Size: {(fileData.size / 1024).toFixed(1)} KB
+                                                </p>
+                                            </div>
+                                            <div className="mt-5 p-4 bg-gray-200 rounded-lg border-l-4 border-black">
+                                                <p className="text-black text-sm m-0">
+                                                    <strong>IPFS Hash:</strong> {selectedVault?.ipfsHash}<br/>
+                                                    <strong>File Type:</strong> {fileData.type}<br/>
+                                                    <strong>File Size:</strong> {(fileData.size / 1024).toFixed(1)} KB<br/>
+                                                    <strong>Source:</strong> IPFS Network
+                                                </p>
+                                                <div className="mt-3">
+                                                    <button 
+                                                        onClick={() => {
+                                                            const url = URL.createObjectURL(new Blob([fileData.data as BlobPart], { type: fileData.type }));
+                                                            const a = document.createElement('a');
+                                                            a.href = url;
+                                                            a.download = selectedVault?.fileName || 'image';
+                                                            document.body.appendChild(a);
+                                                            a.click();
+                                                            document.body.removeChild(a);
+                                                            URL.revokeObjectURL(url);
+                                                        }}
+                                                        className="bg-black text-white border-none px-4 py-2 rounded cursor-pointer text-sm hover:bg-gray-800"
+                                                    >
+                                                        Download Image
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : fileContent === 'pdf' ? (
+                                        <div>
+                                            <h3 className="text-xl font-semibold mb-5 text-black">PDF Document: {selectedVault?.fileName}</h3>
+                                            <div className="bg-gray-100 border-2 border-black rounded-lg p-5 m-5">
+                                                <div className="bg-gray-200 rounded-lg p-10 m-5 text-center">
+                                                    <p className="text-gray-700 text-5xl m-0">PDF</p>
+                                                    <p className="text-black text-base mt-3 m-0">
+                                                        PDF: {selectedVault?.fileName}
+                                                    </p>
+                                                </div>
+                                                <p className="text-black font-medium mt-4">
+                                                    PDF file loaded from IPFS! Size: {(fileData.size / 1024).toFixed(1)} KB
+                                                </p>
+                                            </div>
+                                            <div className="mt-5 p-4 bg-gray-200 rounded-lg border-l-4 border-black">
+                                                <button 
+                                                    onClick={() => {
+                                                        const url = URL.createObjectURL(new Blob([fileData.data as BlobPart], { type: fileData.type }));
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = selectedVault?.fileName || 'document.pdf';
+                                                        document.body.appendChild(a);
+                                                        a.click();
+                                                        document.body.removeChild(a);
+                                                        URL.revokeObjectURL(url);
+                                                    }}
+                                                    className="bg-black text-white border-none px-4 py-2 rounded cursor-pointer text-sm hover:bg-gray-800"
+                                                >
+                                                    Download PDF
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : fileContent === 'txt' ? (
+                                        <div>
+                                            <h3 className="text-xl font-semibold mb-5 text-black">Text File: {selectedVault?.fileName}</h3>
+                                            <div className="bg-gray-100 border-2 border-black rounded-lg p-5 m-5">
+                                                <h4 className="text-black mb-4">File Content:</h4>
+                                                <pre className="bg-white p-4 rounded-lg m-3 whitespace-pre-wrap font-mono text-xs text-left max-h-80 overflow-y-auto border border-gray-300 text-black">{fileData.data}</pre>
+                                                <p className="text-black font-medium mt-4">
+                                                    Text file loaded from IPFS! Size: {(fileData.size / 1024).toFixed(1)} KB
+                                                </p>
+                                            </div>
+                                            <div className="mt-5 p-4 bg-gray-200 rounded-lg border-l-4 border-black">
+                                                <button 
+                                                    onClick={() => {
+                                                        const blob = new Blob([fileData.data as BlobPart], { type: fileData.type });
+                                                        const url = URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = selectedVault?.fileName || 'document.txt';
+                                                        document.body.appendChild(a);
+                                                        a.click();
+                                                        document.body.removeChild(a);
+                                                        URL.revokeObjectURL(url);
+                                                    }}
+                                                    className="bg-black text-white border-none px-4 py-2 rounded cursor-pointer text-sm hover:bg-gray-800"
+                                                >
+                                                    Download Text File
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <h3 className="text-xl font-semibold mb-5 text-black">File: {selectedVault?.fileName}</h3>
+                                            <div className="bg-gray-100 border-2 border-black rounded-lg p-5 m-5">
+                                                <div className="bg-gray-200 rounded-lg p-10 m-5 text-center">
+                                                    <p className="text-gray-700 text-5xl m-0">File</p>
+                                                    <p className="text-black text-base mt-3 m-0">
+                                                        File: {selectedVault?.fileName}
+                                                    </p>
+                                                </div>
+                                                <p className="text-black font-medium mt-4">
+                                                    File loaded from IPFS! Size: {(fileData.size / 1024).toFixed(1)} KB
+                                                </p>
+                                                <p className="text-black mt-3">
+                                                    File type: {fileData.type}
+                                                </p>
+                                            </div>
+                                            <div className="mt-5 p-4 bg-gray-200 rounded-lg border-l-4 border-black">
+                                                <button 
+                                                    onClick={() => {
+                                                        const url = URL.createObjectURL(new Blob([fileData.data as BlobPart], { type: fileData.type }));
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = selectedVault?.fileName || 'file';
+                                                        document.body.appendChild(a);
+                                                        a.click();
+                                                        document.body.removeChild(a);
+                                                        URL.revokeObjectURL(url);
+                                                    }}
+                                                    className="bg-black text-white border-none px-4 py-2 rounded cursor-pointer text-sm hover:bg-gray-800"
+                                                >
+                                                    Download File
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>
@@ -1371,52 +1365,12 @@ export default function NomineePage() {
 
                             {selectedVault.fileName && (
                                 <div>
-                                    <label className="font-medium">File:</label>
-                                    <div className="mt-2 flex items-center space-x-3">
-                                        <span className="text-sm">{selectedVault.fileName}</span>
-                                        <button
-                                            onClick={() => getFileContent(selectedVault)}
-                                            disabled={isLoadingFile}
-                                            className={clsx(
-                                                "px-3 py-1 text-sm rounded-md transition-colors",
-                                                isDarkMode
-                                                    ? "bg-blue-600 text-white hover:bg-blue-500 disabled:bg-gray-600"
-                                                    : "bg-blue-200 text-blue-700 hover:bg-blue-300 disabled:bg-gray-200"
-                                            )}
-                                        >
-                                            {isLoadingFile ? "Loading..." : "View File"}
-                                        </button>
-                                    </div>
+                                    <label className="font-medium">Files Attached: True</label>
+                                    
                                 </div>
                             )}
 
-                            {/* File Content Display */}
-                            {showFileContent && (
-                                <div className="mt-4">
-                                    <label className="font-medium">File Content:</label>
-                                    <div className={clsx(
-                                        "mt-2 p-4 rounded-lg border max-h-96 overflow-y-auto font-mono text-sm",
-                                        isDarkMode 
-                                            ? "bg-gray-900 border-gray-600 text-gray-100" 
-                                            : "bg-gray-50 border-gray-300 text-gray-800"
-                                    )}>
-                                        <pre className="whitespace-pre-wrap break-words">{fileContent}</pre>
-                                    </div>
-                                    <div className="mt-2 flex justify-end">
-                                        <button
-                                            onClick={() => setShowFileContent(false)}
-                                            className={clsx(
-                                                "px-3 py-1 text-sm rounded-md transition-colors",
-                                                isDarkMode
-                                                    ? "bg-gray-600 text-white hover:bg-gray-500"
-                                                    : "bg-gray-200 text-gray-700 hover:bg-gray-800"
-                                            )}
-                                        >
-                                            Hide Content
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            {/* Remove the File Content Display section completely */}
                         </div>
                     </div>
                 </div>

@@ -30,7 +30,7 @@ export interface FileAsset {
   userRole?: 'owner' | 'nominee';
 }
 
-export const useNominee = () => {
+export const useNominee = (onVaultCreated?: () => void) => {
   const [activeTab, setActiveTab] = useState("create");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -149,9 +149,9 @@ export const useNominee = () => {
       // Upload file to IPFS if user actually uploaded a file
       let ipfsHash: string | null = null;
       if (selectedFile) {
-        console.log("📤 Starting IPFS upload...");
+        console.log("Starting IPFS upload...");
         ipfsHash = await uploadToIPFS(selectedFile);
-        console.log("✅ IPFS upload completed:", ipfsHash);
+        console.log("IPFS upload completed:", ipfsHash);
       }
 
       // Generate file hash for metadata
@@ -227,7 +227,7 @@ export const useNominee = () => {
       const encodedMessage = ethers.toUtf8Bytes(JSON.stringify(rawData));
 
       // Debug: Log what we're encrypting and its size
-      console.log("🔍 Encryption Debug:");
+      console.log("Encryption Debug:");
       console.log("Flattened data:", {
         description: description.substring(0, 50),
         address,
@@ -238,7 +238,7 @@ export const useNominee = () => {
       console.log("Encoded message length:", encodedMessage.length, "bytes");
       
       // Size breakdown for debugging
-      console.log("📊 Size Breakdown:");
+      console.log("Size Breakdown:");
       console.log(`- Description (${description.substring(0, 35).length} chars): ${description.substring(0, 35).length} bytes`);
       console.log(`- Owner address: ${address?.length || 0} bytes`);
       console.log(`- Nominees (${validNominees.slice(0, 1).length} address): ${validNominees.slice(0, 1).reduce((acc, addr) => acc + (addr?.length || 0), 0)} bytes`);
@@ -250,7 +250,7 @@ export const useNominee = () => {
       }
       console.log(`- JSON overhead: ~${encodedMessage.length - (description.substring(0, 35).length + (address?.length || 0) + validNominees.slice(0, 1).reduce((acc, addr) => acc + (addr?.length || 0), 0) + Math.floor(new Date(unlockDate).getTime() / 1000).toString().length + (selectedFile ? (fileHash ? fileHash.length : 0) : 0))} bytes`);
       console.log(`- Total encoded: ${encodedMessage.length} bytes`);
-      console.log(`- ABI overhead eliminated! 🎉`);
+      console.log(`- ABI overhead eliminated!`);
       
       // Check message size before encryption
       if (encodedMessage.length > 256) {
@@ -323,12 +323,12 @@ export const useNominee = () => {
         }
 
         const savedVault = await response.json();
-        console.log('✅ Vault saved to database:', savedVault);
+        console.log('Vault saved to database:', savedVault);
 
         // Refresh vault list
         refetchVaults();
       } catch (error) {
-        console.error('❌ Error saving vault to database:', error);
+        console.error('Error saving vault to database:', error);
         // Continue with blockchain success, but log database error
       }
 
@@ -341,7 +341,12 @@ export const useNominee = () => {
       setUploadProgress(0);
       setActiveTab("dashboard");
 
-      console.log("✅ Vault created successfully and saved to database");
+      console.log("Vault created successfully and saved to database");
+
+      // Trigger success callback if provided
+      if (onVaultCreated) {
+        onVaultCreated();
+      }
 
       return receipt;
     },
@@ -393,11 +398,11 @@ export const useNominee = () => {
     try {
       if (asset.ipfsHash && isValidIPFSHash(asset.ipfsHash)) {
         // Download real file from IPFS
-        console.log(`📥 Downloading ${asset.fileName} from IPFS: ${asset.ipfsHash}`);
+        console.log(`Downloading ${asset.fileName} from IPFS: ${asset.ipfsHash}`);
         await downloadFromIPFS(asset.ipfsHash, asset.fileName);
       } else {
         // Create a proper file based on the asset type
-        console.log("⚠️ No IPFS hash found, creating file from vault data");
+        console.log("No IPFS hash found, creating file from vault data");
         
         let fileContent: string = '';
         let mimeType = 'text/plain';
@@ -410,12 +415,10 @@ export const useNominee = () => {
           fileContent = `PNG Image File: ${asset.fileName}
 
 ╔══════════════════════════════════════════════════════════════╗
-║                    🖼️  DEMO PNG IMAGE                        ║
+║                    DEMO PNG IMAGE                            ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║  ████████████████████████████████████████████████████████  ║
-║  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█  ║
-║  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█  ║
 ║  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█  ║
 ║  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█  ║
 ║  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█  ║
@@ -441,12 +444,10 @@ Generated at: ${new Date().toISOString()}`;
           fileContent = `JPEG Image File: ${asset.fileName}
 
 ╔══════════════════════════════════════════════════════════════╗
-║                    🖼️  DEMO JPEG IMAGE                       ║
+║                    DEMO JPEG IMAGE                           ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║  ████████████████████████████████████████████████████████  ║
-║  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█  ║
-║  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█  ║
 ║  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█  ║
 ║  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█  ║
 ║  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█  ║
@@ -472,12 +473,12 @@ Generated at: ${new Date().toISOString()}`;
           fileContent = `PDF Document: ${asset.fileName}
 
 ╔══════════════════════════════════════════════════════════════╗
-║                    📄  DEMO PDF DOCUMENT                      ║
+║                    DEMO PDF DOCUMENT                         ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║  ┌────────────────────────────────────────────────────────┐  ║
 ║  │                                                        │  ║
-║  │  📊  DOCUMENT TITLE                                    │  ║
+║  │  DOCUMENT TITLE                                        │  ║
 ║  │                                                        │  ║
 ║  │  This is a demo PDF document that shows what the      │  ║
 ║  │  actual PDF would look like in production.            │  ║
@@ -499,22 +500,22 @@ This would be the actual PDF content in production.
 Generated at: ${new Date().toISOString()}`;
         } else if (fileExtension === 'docx' || fileExtension === 'doc') {
           mimeType = 'text/plain';
-          fileContent = `Microsoft Word Document: ${asset.fileName}
+          fileContent = `Word Document: ${asset.fileName}
 
 ╔══════════════════════════════════════════════════════════════╗
-║                  📝  DEMO WORD DOCUMENT                      ║
+║                  DEMO WORD DOCUMENT                          ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║  ┌────────────────────────────────────────────────────────┐  ║
 ║  │                                                        │  ║
-║  │  📋  DOCUMENT CONTENT                                  │  ║
+║  │  DOCUMENT CONTENT                                      │  ║
 ║  │                                                        │  ║
 ║  │  This is a demo Word document that shows what the     │  ║
 ║  │  actual document would look like in production.       │  ║
 ║  │                                                        │  ║
-║  │  • Multiple paragraphs                                 │  ║
-║  │  • Formatting options                                  │  ║
-║  │  • Tables and charts                                   │  ║
+║  │  • Document properties                                 │  ║
+║  │  • Content structure                                   │  ║
+║  │  • Formatting information                             │  ║
 ║  │                                                        │  ║
 ║  └────────────────────────────────────────────────────────┘  ║
 ║                                                              ║
@@ -524,28 +525,30 @@ Vault Description: ${asset.description}
 Unlock Time: ${asset.unlockTime}
 File Hash: ${asset.fileHash}
 
-This would be the actual document content in production.
+This would be the actual Word document content in production.
 
 Generated at: ${new Date().toISOString()}`;
-        } else if (fileExtension === 'pptx') {
+        } else if (fileExtension === 'pptx' || fileExtension === 'ppt') {
           mimeType = 'text/plain';
           fileContent = `PowerPoint Presentation: ${asset.fileName}
 
 ╔══════════════════════════════════════════════════════════════╗
-║                🎯  DEMO POWERPOINT PRESENTATION              ║
+║                DEMO POWERPOINT PRESENTATION                 ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║  ┌────────────────────────────────────────────────────────┐  ║
 ║  │                                                        │  ║
-║  │  🎬  SLIDE 1: TITLE SLIDE                              │  ║
+║  │  SLIDE 1: TITLE SLIDE                                  │  ║
 ║  │                                                        │  ║
 ║  │  • Presentation Title                                  │  ║
-║  │  • Subtitle                                            │  ║
-║  │  • Author Name                                         │  ║
+║  │  • Subtitle or Author                                 │  ║
+║  │  • Date                                               │  ║
 ║  │                                                        │  ║
-║  │  🎬  SLIDE 2: CONTENT                                  │  ║
-║  │  • Bullet points                                       │  ║
-║  │  • Images and charts                                   │  ║
+║  │  ┌────────────────────────────────────────────────┐    │  ║
+║  │  │                                                │    │  ║
+║  │  │  [Slide content would go here]                │    │  ║
+║  │  │                                                │    │  ║
+║  │  └────────────────────────────────────────────────┘    │  ║
 ║  │                                                        │  ║
 ║  └────────────────────────────────────────────────────────┘  ║
 ║                                                              ║
@@ -555,7 +558,7 @@ Vault Description: ${asset.description}
 Unlock Time: ${asset.unlockTime}
 File Hash: ${asset.fileHash}
 
-This would be the actual presentation content in production.
+This would be the actual PowerPoint presentation content in production.
 
 Generated at: ${new Date().toISOString()}`;
         } else if (fileExtension === 'txt') {
@@ -563,29 +566,22 @@ Generated at: ${new Date().toISOString()}`;
           fileContent = `Text File: ${asset.fileName}
 
 ╔══════════════════════════════════════════════════════════════╗
-║                    📝  DEMO TEXT FILE                        ║
+║                    DEMO TEXT FILE                            ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
-║  This is a demo text file that shows what the actual      ║
+║  This is a demo text file that shows what the actual       ║
 ║  text content would look like in production.               ║
 ║                                                              ║
-║  You can include:                                          ║
-║  • Multiple paragraphs                                     ║
-║  • Lists and bullet points                                 ║
-║  • Code snippets                                           ║
-║  • Any plain text content                                  ║
+║  The file would contain the actual text content that       ║
+║  was uploaded to the vault, not this demo placeholder.     ║
 ║                                                              ║
-║  The file will be readable in any text editor.             ║
+║  Vault Description: ${asset.description}                    ║
+║  Unlock Time: ${asset.unlockTime}                          ║
+║  File Hash: ${asset.fileHash}                              ║
 ║                                                              ║
-╚══════════════════════════════════════════════════════════════╝
-
-Vault Description: ${asset.description}
-Unlock Time: ${asset.unlockTime}
-File Hash: ${asset.fileHash}
-
-This would be the actual text content in production.
-
-Generated at: ${new Date().toISOString()}`;
+║  Generated at: ${new Date().toISOString()}                 ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝`;
         } else {
           // Default to text file for unknown types
           mimeType = 'text/plain';
@@ -602,10 +598,10 @@ Generated at: ${new Date().toISOString()}`;
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         
-        console.log(`✅ File created and downloaded: ${asset.fileName} (${mimeType}) - ${blob.size} bytes`);
+        console.log(`File created and downloaded: ${asset.fileName} (${mimeType}) - ${blob.size} bytes`);
       }
     } catch (error) {
-      console.error("❌ Download failed:", error);
+      console.error("Download failed:", error);
       alert(`Download failed: ${error}`);
     }
   };
