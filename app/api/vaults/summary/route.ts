@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic'
+
 // GET /api/vaults/summary - Get vaults summary with locked/unlocked separation
 export async function GET(request: NextRequest) {
   try {
@@ -60,10 +63,10 @@ export async function GET(request: NextRequest) {
           isUnlocked: true
         })
       } else {
-        // Locked: send only owner address and unlock time
+        // Locked: send owner object and unlock time (consistent with other vaults)
         lockedVaults.push({
           id: vault.id,
-          owner_wallet_address: vault.owner.address,
+          owner: { address: vault.owner.address },
           unlocks_on: vault.unlockTime
         })
       }

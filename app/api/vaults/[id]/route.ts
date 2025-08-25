@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic'
+
 // PUT /api/vaults/[id] - Update vault (e.g., mark as unlocked)
 export async function PUT(
   request: NextRequest,
